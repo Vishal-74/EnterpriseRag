@@ -17,6 +17,9 @@ _PRICES: dict[str, tuple[float, float]] = {
     "claude-3-5-haiku-latest": (0.80, 4.00),
     "claude-3-5-sonnet-latest": (3.00, 15.00),
     "text-embedding-3-small": (0.02, 0.0),
+    "gemini-flash-lite-latest": (0.075, 0.30),
+    "gemini-2.5-flash": (0.075, 0.30),
+    "gemini-embedding-001": (0.02, 0.0),
 }
 
 _encoder = None
