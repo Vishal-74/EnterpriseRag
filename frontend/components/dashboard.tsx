@@ -67,26 +67,61 @@ export function Dashboard() {
 }
 
 function TokenChart({ points }: { points: UsagePoint[] }) {
-  const grouped = new Map<string, number>();
+  const grouped = new Map<string, { total: number; models: Record<string, number> }>();
   for (const point of points) {
     const day = point.day.slice(0, 10);
-    grouped.set(day, (grouped.get(day) || 0) + point.total_tokens);
+    const current = grouped.get(day) || { total: 0, models: {} };
+    current.total += point.total_tokens;
+    if (point.total_tokens > 0) {
+      current.models[point.model] = (current.models[point.model] || 0) + point.total_tokens;
+    }
+    grouped.set(day, current);
   }
   const rows = [...grouped.entries()];
-  const max = Math.max(...rows.map(([, value]) => value), 1);
+  const max = Math.max(...rows.map(([, data]) => data.total), 1);
+  const totalTokens = rows.reduce((sum, [, d]) => sum + d.total, 0);
+
   return (
-    <section className="rounded-2xl border border-line bg-white p-5">
-      <h2 className="font-display text-2xl">Tokens by day</h2>
-      <div className="mt-6 flex h-48 items-end gap-3">
-        {rows.map(([day, value]) => (
-          <div key={day} className="flex flex-1 flex-col items-center gap-2">
-            <div className="flex w-full flex-1 items-end">
-              <div className="w-full rounded-t-lg bg-moss" style={{ height: `${Math.max(8, (value / max) * 100)}%` }} />
-            </div>
-            <span className="text-[11px] text-mist">{day.slice(5)}</span>
-          </div>
-        ))}
+    <section className="rounded-2xl border border-line bg-white p-6 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line/60 pb-4">
+        <div>
+          <h2 className="font-display text-2xl text-ink">Tokens by day</h2>
+          <p className="text-xs text-mist">Daily consumption across all operations and agent runs</p>
+        </div>
+        <div className="rounded-xl bg-paper px-3 py-1.5 text-sm font-medium text-ink">
+          {totalTokens.toLocaleString()} tokens logged
+        </div>
       </div>
+      <div className="mt-6 flex h-52 items-end justify-start gap-6 overflow-x-auto rounded-xl border border-line/40 bg-[#faf8f5] p-6">
+        {rows.map(([day, data]) => {
+          const heightPct = Math.max(16, Math.round((data.total / max) * 100));
+          return (
+            <div key={day} className="flex h-full w-28 flex-col items-center justify-end gap-2">
+              <span className="text-xs font-semibold text-ink">
+                {data.total > 1000 ? `${(data.total / 1000).toFixed(1)}k` : data.total}
+              </span>
+              <div className="relative flex h-32 w-14 items-end justify-center rounded-lg bg-line/20 p-1">
+                <div
+                  className="w-full rounded-md bg-moss transition-all duration-300"
+                  style={{ height: `${heightPct}%`, minHeight: "14px" }}
+                  title={`${day}: ${data.total.toLocaleString()} tokens`}
+                />
+              </div>
+              <span className="text-xs font-medium text-mist">{day.slice(5)}</span>
+            </div>
+          );
+        })}
+      </div>
+      {rows.length > 0 && Object.keys(rows[0][1].models).length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2 text-xs text-mist">
+          <span className="font-medium text-ink">By model:</span>
+          {Object.entries(rows[0][1].models).map(([model, count]) => (
+            <span key={model} className="rounded-md border border-line/60 bg-paper px-2 py-0.5">
+              {model}: <strong className="text-ink">{count.toLocaleString()}</strong>
+            </span>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

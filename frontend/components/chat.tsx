@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { EmptyState, ErrorState, LoadingState } from "@/components/states";
 import { api } from "@/lib/api";
@@ -20,6 +20,7 @@ export function Chat({ conversationId }: { conversationId?: string }) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeCitation, setActiveCitation] = useState<Citation | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const stored = window.localStorage.getItem("meridian-provider");
@@ -44,6 +45,10 @@ export function Chat({ conversationId }: { conversationId?: string }) {
     load();
   }, [load]);
 
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, sending]);
+
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
@@ -64,7 +69,9 @@ export function Chat({ conversationId }: { conversationId?: string }) {
       } else {
         load();
       }
-      setActiveCitation(response.citations[0] || null);
+      if (response.citations?.length) {
+        setActiveCitation(response.citations[0]);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The question failed.");
     } finally {
@@ -73,63 +80,55 @@ export function Chat({ conversationId }: { conversationId?: string }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr_280px]">
-      <aside>
-        <h1 className="font-display text-3xl">Ask</h1>
-        <Link className="mt-4 inline-block text-sm underline" href="/chat">
-          New conversation
-        </Link>
-        <div className="mt-4 space-y-2">
-          {conversations.length === 0 && !loading ? <p className="text-sm text-mist">No conversations yet.</p> : null}
+    <div className="grid h-[calc(100vh-6.5rem)] gap-4 overflow-hidden lg:grid-cols-[250px_1fr_320px]">
+      {/* 1. Left Sidebar: History */}
+      <aside className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="border-b border-line/60 pb-3">
+          <div className="flex items-center justify-between">
+            <h1 className="font-display text-2xl text-ink">Ask</h1>
+            <span className="rounded-full bg-paper px-2 py-0.5 text-[11px] font-medium text-mist">Chat</span>
+          </div>
+          <Link
+            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-ink px-3 py-2 text-xs font-medium text-paper transition-opacity hover:opacity-90"
+            href="/chat"
+          >
+            <span>+ New conversation</span>
+          </Link>
+        </div>
+        <div className="mt-3 flex items-center justify-between px-1 text-[11px] font-semibold uppercase tracking-wider text-mist">
+          <span>Recent chats</span>
+          <span className="text-[10px]">{conversations.length}</span>
+        </div>
+        <div className="mt-2 flex-1 space-y-1 overflow-y-auto pr-1">
+          {conversations.length === 0 && !loading ? (
+            <p className="px-2 py-4 text-center text-xs text-mist">No conversations yet.</p>
+          ) : null}
           {conversations.map((conversation) => (
             <Link
               key={conversation.id}
               href={`/chat/${conversation.id}`}
-              className={`block rounded-xl px-3 py-2 text-sm ${
-                conversation.id === conversationId ? "bg-ink text-paper" : "bg-white"
+              className={`block truncate rounded-xl px-3 py-2 text-xs transition-colors ${
+                conversation.id === conversationId
+                  ? "bg-ink font-medium text-paper shadow-sm"
+                  : "text-ink hover:bg-paper"
               }`}
+              title={conversation.title}
             >
               {conversation.title}
             </Link>
           ))}
         </div>
       </aside>
-      <section className="space-y-4">
-        {loading ? <LoadingState label="Loading conversation" /> : null}
-        {error ? <ErrorState message={error} onRetry={load} /> : null}
-        {!loading && messages.length === 0 ? (
-          <EmptyState title="Ask the library" body="Answers cite the document, page or section, and chunk. Missing evidence stays missing." />
-        ) : null}
-        <div className="space-y-4">
-          {messages.map((message) => (
-            <article key={message.id} className="rounded-2xl border border-line bg-white px-4 py-3">
-              <p className="text-xs uppercase tracking-wide text-mist">{message.role}</p>
-              <p className="mt-2 whitespace-pre-wrap">{message.content}</p>
-              <MessageFlags metadata={message.metadata} />
-              {message.citations?.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {message.citations.map((citation) => (
-                    <button
-                      key={citation.chunk_id}
-                      className="rounded-full bg-paper px-3 py-1 text-xs"
-                      type="button"
-                      onClick={() => setActiveCitation(citation)}
-                    >
-                      {citation.document_name}
-                      {citation.page_start ? ` p.${citation.page_start}` : ""}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </article>
-          ))}
-        </div>
-        <form className="space-y-3" onSubmit={onSubmit}>
-          <div className="flex flex-wrap gap-3 text-sm">
-            <label>
-              Model
+
+      {/* 2. Middle Pane: Chatbot conversation thread & input */}
+      <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+        {/* Model & Scope header bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line/60 bg-[#faf8f5] px-4 py-2.5 text-xs">
+          <div className="flex items-center gap-2">
+            <label className="font-medium text-ink">
+              Model:
               <select
-                className="ml-2 rounded-lg border border-line bg-white px-2 py-1"
+                className="ml-1.5 rounded-lg border border-line bg-white px-2 py-1 text-xs font-medium"
                 value={provider}
                 onChange={(event) => setProvider(event.target.value)}
               >
@@ -137,40 +136,176 @@ export function Chat({ conversationId }: { conversationId?: string }) {
                 <option value="huggingface">Hugging Face</option>
               </select>
             </label>
-            <fieldset className="flex flex-wrap gap-2">
-              {documents.map((document) => (
-                <label key={document.id} className="rounded-full bg-white px-2 py-1">
-                  <input
-                    className="mr-1"
-                    type="checkbox"
-                    checked={selectedDocs.includes(document.id)}
-                    onChange={(event) =>
-                      setSelectedDocs((current) =>
-                        event.target.checked
-                          ? [...current, document.id]
-                          : current.filter((id) => id !== document.id),
-                      )
-                    }
-                  />
-                  {document.original_filename}
-                </label>
-              ))}
-            </fieldset>
           </div>
-          <textarea
-            className="min-h-24 w-full rounded-2xl border border-line bg-white px-3 py-2"
-            placeholder="Ask about the documents you uploaded"
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-          <button className="rounded-full bg-ink px-4 py-2 text-paper disabled:opacity-60" disabled={sending} type="submit">
-            {sending ? "Thinking…" : "Ask"}
-          </button>
+          <div className="flex max-w-full flex-wrap items-center gap-1.5 overflow-x-auto">
+            <span className="text-[11px] text-mist">Scope:</span>
+            {documents.length === 0 ? (
+              <span className="text-[11px] text-mist">All library documents</span>
+            ) : (
+              documents.map((document) => {
+                const isChecked = selectedDocs.includes(document.id);
+                return (
+                  <label
+                    key={document.id}
+                    className={`cursor-pointer rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
+                      isChecked
+                        ? "border-ink bg-ink text-paper"
+                        : "border-line bg-white text-ink hover:bg-paper"
+                    }`}
+                  >
+                    <input
+                      className="sr-only"
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={(event) =>
+                        setSelectedDocs((current) =>
+                          event.target.checked
+                            ? [...current, document.id]
+                            : current.filter((id) => id !== document.id),
+                        )
+                      }
+                    />
+                    {document.original_filename}
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Scrollable messages thread */}
+        <div className="flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
+          {loading ? <LoadingState label="Loading conversation" /> : null}
+          {error ? <ErrorState message={error} onRetry={load} /> : null}
+          {!loading && messages.length === 0 ? (
+            <div className="flex h-full flex-col items-center justify-center text-center">
+              <div className="max-w-md space-y-2 rounded-2xl border border-line/70 bg-[#faf8f5] p-6">
+                <p className="font-display text-xl text-ink">Ask the Enterprise Library</p>
+                <p className="text-xs text-mist">
+                  Answers cite verified document chunks, page numbers, and exact excerpts.
+                </p>
+                <div className="mt-4 flex flex-col gap-1.5 text-left text-xs">
+                  <span className="font-medium text-ink">Try asking:</span>
+                  <button
+                    type="button"
+                    onClick={() => setDraft("What model of backup generator is installed in the facility and what is its rating?")}
+                    className="rounded-lg border border-line/60 bg-white px-3 py-1.5 text-mist transition-colors hover:border-ink hover:text-ink"
+                  >
+                    "What model of backup generator is installed in the facility and what is its rating?"
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDraft("What is the required fuel reserve percentage for the generators?")}
+                    className="rounded-lg border border-line/60 bg-white px-3 py-1.5 text-mist transition-colors hover:border-ink hover:text-ink"
+                  >
+                    "What is the required fuel reserve percentage for the generators?"
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {messages.map((message) => {
+            const isUser = message.role === "user";
+            return (
+              <div key={message.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+                <article
+                  className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                    isUser
+                      ? "max-w-[80%] rounded-br-sm bg-ink text-paper"
+                      : "max-w-[88%] rounded-bl-sm border border-line/70 bg-[#faf8f5] text-ink"
+                  }`}
+                >
+                  <p className="whitespace-pre-wrap">{message.content}</p>
+
+                  {!isUser && message.metadata ? <MessageFlags metadata={message.metadata} /> : null}
+
+                  {!isUser && message.citations?.length ? (
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-line/50 pt-2 text-xs">
+                      <span className="text-[11px] font-medium text-mist">Citations:</span>
+                      {message.citations.map((citation) => (
+                        <button
+                          key={citation.chunk_id}
+                          className="rounded-full border border-line bg-white px-2.5 py-0.5 text-xs text-ink transition-colors hover:border-ink hover:bg-paper"
+                          type="button"
+                          onClick={() => setActiveCitation(citation)}
+                        >
+                          📎 {citation.document_name}
+                          {citation.page_start ? ` p.${citation.page_start}` : ""}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              </div>
+            );
+          })}
+          {sending ? (
+            <div className="flex justify-start">
+              <div className="rounded-2xl rounded-bl-sm border border-line/60 bg-paper/40 px-4 py-3 text-xs text-mist">
+                Retrieving excerpts and drafting verified answer…
+              </div>
+            </div>
+          ) : null}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Fixed Prompt Input Bar at Bottom with Ask button on right */}
+        <form className="border-t border-line/70 bg-white p-3 md:p-4" onSubmit={onSubmit}>
+          <div className="flex items-end gap-2.5">
+            <textarea
+              className="min-h-[48px] max-h-32 flex-1 resize-none rounded-xl border border-line bg-paper/40 px-3.5 py-2.5 text-sm focus:border-ink focus:bg-white focus:outline-none"
+              placeholder="Ask a question about your uploaded documents (Enter to send, Shift+Enter for new line)..."
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  void onSubmit(event);
+                }
+              }}
+            />
+            <button
+              className="flex h-[48px] shrink-0 items-center justify-center rounded-xl bg-ink px-6 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
+              disabled={sending || !draft.trim()}
+              type="submit"
+            >
+              {sending ? "Thinking…" : "Ask"}
+            </button>
+          </div>
         </form>
       </section>
-      <aside className="rounded-2xl border border-line bg-white p-4">
-        <h2 className="font-display text-xl">Source</h2>
-        {activeCitation ? <CitationCard citation={activeCitation} /> : <p className="mt-3 text-sm text-mist">Select a citation to read the snippet.</p>}
+
+      {/* 3. Right Sidebar: Sources & Evidence Panel */}
+      <aside className="flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between border-b border-line/60 pb-3">
+          <div>
+            <h2 className="font-display text-lg text-ink">Source Evidence</h2>
+            <p className="text-[11px] text-mist">Verified chunk citations</p>
+          </div>
+          {activeCitation ? (
+            <button
+              onClick={() => setActiveCitation(null)}
+              className="rounded-md border border-line px-2 py-0.5 text-xs text-mist hover:text-ink"
+              type="button"
+            >
+              Clear
+            </button>
+          ) : null}
+        </div>
+        <div className="mt-3 flex-1 overflow-y-auto pr-1">
+          {activeCitation ? (
+            <CitationCard citation={activeCitation} />
+          ) : (
+            <div className="flex h-full flex-col items-center justify-center text-center text-xs text-mist">
+              <span className="text-2xl">📄</span>
+              <p className="mt-2 font-medium text-ink">No Source Selected</p>
+              <p className="mt-1 text-[11px]">
+                Click on any citation pill in an answer to inspect its verified excerpt and chunk location.
+              </p>
+            </div>
+          )}
+        </div>
       </aside>
     </div>
   );
@@ -185,10 +320,10 @@ function MessageFlags({ metadata }: { metadata: Record<string, unknown> }) {
   const historyTokens = Number(metadata.history_tokens || 0);
   return (
     <div className="mt-2 space-y-1 text-xs">
-      {insufficient ? <p className="text-amber-900">Not enough information in the selected documents.</p> : null}
-      {conflict ? <p className="text-clay">Conflict found. {String(metadata.conflict_summary || "")}</p> : null}
-      {ungrounded ? <p className="text-red-800">The verifier did not support the claims.</p> : null}
-      <p className="text-mist">
+      {insufficient ? <p className="text-amber-900 font-medium">Not enough information in the selected documents.</p> : null}
+      {conflict ? <p className="text-clay font-medium">Conflict found: {String(metadata.conflict_summary || "")}</p> : null}
+      {ungrounded ? <p className="text-red-800 font-medium">The verifier did not support the claims.</p> : null}
+      <p className="text-[11px] text-mist">
         {String(metadata.model || "no model")} · {String(metadata.latency_ms || 0)} ms
         {totalTokens > 0 ? ` · ${totalTokens} tokens` : ""}
         {` · ${historyTokens} history tokens`}
@@ -199,14 +334,24 @@ function MessageFlags({ metadata }: { metadata: Record<string, unknown> }) {
 
 function CitationCard({ citation }: { citation: Citation }) {
   return (
-    <div className="mt-3 text-sm">
-      <p className="font-medium">{citation.document_name}</p>
-      <p className="text-mist">
-        {citation.page_start ? `Pages ${citation.page_start}–${citation.page_end || citation.page_start}` : null}
-        {citation.section ? ` ${citation.section}` : null}
-        {citation.row_start ? ` Rows ${citation.row_start}–${citation.row_end}` : null}
-      </p>
-      <p className="mt-3 whitespace-pre-wrap">{citation.snippet}</p>
+    <div className="space-y-3 text-xs">
+      <div className="rounded-xl border border-line/60 bg-paper/50 p-3">
+        <p className="font-semibold text-ink text-sm break-all">{citation.document_name}</p>
+        <p className="mt-1 text-mist text-[11px]">
+          {citation.page_start ? `Pages ${citation.page_start}–${citation.page_end || citation.page_start}` : null}
+          {citation.section ? ` · ${citation.section}` : null}
+          {citation.row_start ? ` · Rows ${citation.row_start}–${citation.row_end}` : null}
+        </p>
+        {citation.score ? (
+          <span className="mt-2 inline-block rounded bg-line/40 px-1.5 py-0.5 text-[10px] text-ink font-medium">
+            Score: {citation.score.toFixed(4)}
+          </span>
+        ) : null}
+      </div>
+      <div className="rounded-xl border border-line/60 bg-white p-3 shadow-inner">
+        <p className="font-medium text-mist uppercase tracking-wider text-[10px] mb-1">Snippet</p>
+        <p className="whitespace-pre-wrap leading-relaxed text-ink/90 text-xs">{citation.snippet}</p>
+      </div>
     </div>
   );
 }
