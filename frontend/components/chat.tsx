@@ -52,7 +52,17 @@ export function Chat({ conversationId }: { conversationId?: string }) {
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
     const message = draft.trim();
-    if (!message) return;
+    if (!message || sending) return;
+    const tempUserMsg: Message = {
+      id: `temp-${Date.now()}`,
+      role: "user",
+      content: message,
+      created_at: new Date().toISOString(),
+      citations: [],
+      metadata: {},
+    };
+    setMessages((current) => [...current, tempUserMsg]);
+    setDraft("");
     setSending(true);
     setError(null);
     window.localStorage.setItem("meridian-provider", provider);
@@ -63,7 +73,6 @@ export function Chat({ conversationId }: { conversationId?: string }) {
         document_ids: selectedDocs,
         provider,
       });
-      setDraft("");
       if (!conversationId) {
         router.push(`/chat/${response.conversation_id}`);
       } else {
@@ -242,19 +251,26 @@ export function Chat({ conversationId }: { conversationId?: string }) {
           })}
           {sending ? (
             <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-sm border border-line/60 bg-paper/40 px-4 py-3 text-xs text-mist">
-                Retrieving excerpts and drafting verified answer…
+              <div className="flex items-center gap-2.5 rounded-2xl rounded-bl-sm border border-line/70 bg-[#faf8f5] px-4 py-3 text-xs text-ink shadow-sm">
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-moss opacity-75" />
+                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-moss" />
+                </span>
+                <span className="font-medium text-mist animate-pulse">
+                  Searching library excerpts and reasoning over verified facts…
+                </span>
               </div>
             </div>
           ) : null}
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Fixed Prompt Input Bar at Bottom with Ask button on right */}
+        {/* Fixed Prompt Input Bar at Bottom with Ask button cleanly aligned on right */}
         <form className="border-t border-line/70 bg-white p-3 md:p-4" onSubmit={onSubmit}>
-          <div className="flex items-end gap-2.5">
+          <div className="relative flex items-center rounded-2xl border border-line bg-paper/40 p-1.5 transition-colors focus-within:border-ink focus-within:bg-white focus-within:ring-1 focus-within:ring-ink">
             <textarea
-              className="min-h-[48px] max-h-32 flex-1 resize-none rounded-xl border border-line bg-paper/40 px-3.5 py-2.5 text-sm focus:border-ink focus:bg-white focus:outline-none"
+              rows={1}
+              className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-3.5 py-2.5 text-sm text-ink placeholder:text-mist focus:outline-none"
               placeholder="Ask a question about your uploaded documents (Enter to send, Shift+Enter for new line)..."
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -266,11 +282,12 @@ export function Chat({ conversationId }: { conversationId?: string }) {
               }}
             />
             <button
-              className="flex h-[48px] shrink-0 items-center justify-center rounded-xl bg-ink px-6 text-sm font-medium text-paper transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl bg-ink px-5 text-xs font-semibold text-paper transition-opacity hover:opacity-90 disabled:opacity-40"
               disabled={sending || !draft.trim()}
               type="submit"
             >
-              {sending ? "Thinking…" : "Ask"}
+              <span>{sending ? "Thinking…" : "Ask"}</span>
+              {!sending ? <span className="text-sm">➔</span> : null}
             </button>
           </div>
         </form>

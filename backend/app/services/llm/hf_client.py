@@ -123,6 +123,15 @@ def _translate(exc: Exception) -> ProviderError:
             provider="huggingface",
             status_code=status,
             fallback=True,
+            retry_same=False,
+        )
+    if status in (400, 402, 404):
+        return ProviderError(
+            f"Hugging Face request failed with status {status}",
+            provider="huggingface",
+            status_code=status,
+            fallback=True,
+            retry_same=False,
         )
     if isinstance(exc, APIStatusError) and status is not None and status >= 500:
         return ProviderError(
@@ -138,6 +147,7 @@ def _translate(exc: Exception) -> ProviderError:
             provider="huggingface",
             status_code=status,
             fallback=True,
+            retry_same=False,
         )
     return ProviderError(
         "Hugging Face request failed", provider="huggingface", fallback=True, retry_same=False
