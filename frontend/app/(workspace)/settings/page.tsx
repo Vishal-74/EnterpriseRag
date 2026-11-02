@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 export default function SettingsPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState("gemini");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -17,7 +17,7 @@ export default function SettingsPage() {
       .then((user) => setEmail(user.email))
       .catch((caught: Error) => setError(caught.message));
     const stored = window.localStorage.getItem("meridian-provider");
-    if (stored === "openai" || stored === "anthropic") setProvider(stored);
+    if (stored === "gemini" || stored === "huggingface") setProvider(stored);
   }, []);
 
   async function logout() {
@@ -43,8 +43,8 @@ export default function SettingsPage() {
             window.localStorage.setItem("meridian-provider", event.target.value);
           }}
         >
-          <option value="openai">OpenAI</option>
-          <option value="anthropic">Claude</option>
+          <option value="gemini">Gemini</option>
+          <option value="huggingface">Hugging Face</option>
         </select>
       </label>
       <p className="text-sm text-mist">

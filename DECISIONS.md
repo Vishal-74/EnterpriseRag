@@ -66,7 +66,11 @@ Document ids on an agent run come from the user request. The planner cannot wide
 
 ## D-017 Hugging Face fallback provider
 
-A third chat provider using the OpenAI-compatible SDK endpoint on Hugging Face (`HF_BASE_URL`, `HF_TOKEN`, `HF_MODEL_ID`). Registered as the tertiary fallback in `LLMRouter`: OpenAI -> Anthropic -> HuggingFace. Automatically falls back on 408 (timeout), 429 (rate limit), 5xx server errors, or 401 configuration errors, logging each attempt to `usage_logs`.
+A chat provider using the OpenAI-compatible SDK endpoint on Hugging Face (`HF_BASE_URL`, `HF_TOKEN`, `HF_MODEL_ID`). Registered as fallback in `LLMRouter`. Automatically falls back on 408 (timeout), 429 (rate limit), 5xx server errors, or 401 configuration errors, logging each attempt to `usage_logs`.
+
+## D-018 Gemini Primary Provider and Dual-Provider Fallback
+
+Per project requirements, OpenAI and Anthropic were decoupled from the active routing flow. Google Gemini (`gemini-flash-lite-latest` for chat and `gemini-embedding-001` with `outputDimensionality: 1536` for vectors) operates as the primary provider for all chat, query rewriting, reranking, verification, and agent workflows. Hugging Face serves as the registered fallback client. Exponential backoff with jitter handles transient rate limits before cascading to fallback.
 
 ## Local database
 

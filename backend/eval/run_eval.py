@@ -26,8 +26,8 @@ from app.schemas.chat import ChatRequest, ChatResponse
 from app.services.chat.service import ChatService
 from app.services.documents.service import DocumentService
 from app.services.jobs import InlineJobDispatcher
-from app.services.llm.anthropic_client import AnthropicChatClient
-from app.services.llm.openai_client import OpenAIChatClient, OpenAIEmbedder
+from app.services.llm.gemini_client import GeminiChatClient, GeminiEmbedder
+from app.services.llm.hf_client import HuggingFaceChatClient
 from app.services.llm.router import LLMRouter
 from app.services.worker import agent_job, ingest_job
 from fastapi import UploadFile
@@ -61,27 +61,31 @@ class ScoreRow:
 async def main() -> int:
     settings = get_settings()
     configure_logging(settings.log_level)
-    if not settings.openai_api_key:
-        print("OPENAI_API_KEY is not set. No evaluation results were written.")
+    gemini_key = settings.gemini_api_key or settings.gemini
+    if not gemini_key:
+        print("GEMINI API key is not set. No evaluation results were written.")
         return 2
     dataset = json.loads((ROOT / "dataset.json").read_text())
     db_session.init_engine(settings.async_database_url)
+    gemini_client = GeminiChatClient(
+        gemini_key,
+        settings.gemini_chat_model,
+        settings.llm_timeout_seconds,
+    )
+    hf_client = HuggingFaceChatClient(
+        settings.hf_token,
+        settings.hf_base_url,
+        settings.hf_model_id,
+        settings.llm_timeout_seconds,
+    )
     router = LLMRouter(
-        OpenAIChatClient(
-            settings.openai_api_key,
-            settings.openai_chat_model,
-            settings.llm_timeout_seconds,
-        ),
-        AnthropicChatClient(
-            settings.anthropic_api_key,
-            settings.anthropic_chat_model,
-            settings.llm_timeout_seconds,
-        ),
+        gemini_client=gemini_client,
+        hf_client=hf_client,
         max_attempts=settings.llm_max_attempts,
     )
-    embedder = OpenAIEmbedder(
-        settings.openai_api_key,
-        settings.embedding_model,
+    embedder = GeminiEmbedder(
+        gemini_key,
+        "gemini-embedding-001",
         settings.llm_timeout_seconds,
     )
     dispatcher = InlineJobDispatcher(ingest_job, agent_job)

@@ -124,26 +124,14 @@ async def test_hf_client_successful_completion() -> None:
 
 @pytest.mark.asyncio
 async def test_three_way_fallback_openai_anthropic_to_huggingface() -> None:
-    """When OpenAI and Anthropic fail, LLMRouter falls back to Hugging Face."""
-    openai_mock = MagicMock()
-    openai_mock.provider_name = "openai"
-    openai_mock.complete = AsyncMock(
+    """When Gemini fails, LLMRouter falls back to Hugging Face."""
+    gemini_mock = MagicMock()
+    gemini_mock.provider_name = "gemini"
+    gemini_mock.complete = AsyncMock(
         side_effect=ProviderError(
-            "OpenAI timed out",
-            provider="openai",
-            status_code=408,
-            fallback=True,
-            retry_same=False,
-        )
-    )
-
-    anthropic_mock = MagicMock()
-    anthropic_mock.provider_name = "anthropic"
-    anthropic_mock.complete = AsyncMock(
-        side_effect=ProviderError(
-            "Anthropic 502 bad gateway",
-            provider="anthropic",
-            status_code=502,
+            "Gemini 429 rate limit",
+            provider="gemini",
+            status_code=429,
             fallback=True,
             retry_same=False,
         )
@@ -165,8 +153,7 @@ async def test_three_way_fallback_openai_anthropic_to_huggingface() -> None:
 
     usage_log = LLMCallLog()
     router = LLMRouter(
-        openai_client=openai_mock,
-        anthropic_client=anthropic_mock,
+        gemini_client=gemini_mock,
         hf_client=hf_mock,
         max_attempts=1,
     )
@@ -177,26 +164,21 @@ async def test_three_way_fallback_openai_anthropic_to_huggingface() -> None:
     )
 
     result = await router.complete(
-        request, provider="openai", operation="chat.answer", usage=usage_log
+        request, provider="gemini", operation="chat.answer", usage=usage_log
     )
 
     assert result.provider == "huggingface"
     assert "system recovered via HF" in result.text
-    assert openai_mock.complete.await_count == 1
-    assert anthropic_mock.complete.await_count == 1
+    assert gemini_mock.complete.await_count == 1
     assert hf_mock.complete.await_count == 1
 
-    # Verify usage logging: OpenAI failure, Anthropic failure, and HuggingFace success
-    assert len(usage_log.events) == 3
-    event_openai, event_anthropic, event_hf = usage_log.events
+    # Verify usage logging: Gemini failure and HuggingFace success
+    assert len(usage_log.events) == 2
+    event_gemini, event_hf = usage_log.events
 
-    assert event_openai.provider == "openai"
-    assert event_openai.status == "error"
-    assert "OpenAI timed out" in (event_openai.error or "")
-
-    assert event_anthropic.provider == "anthropic"
-    assert event_anthropic.status == "error"
-    assert "Anthropic 502 bad gateway" in (event_anthropic.error or "")
+    assert event_gemini.provider == "gemini"
+    assert event_gemini.status == "error"
+    assert "Gemini 429 rate limit" in (event_gemini.error or "")
 
     assert event_hf.provider == "huggingface"
     assert event_hf.status == "success"
@@ -208,24 +190,12 @@ async def test_three_way_fallback_openai_anthropic_to_huggingface() -> None:
 @pytest.mark.asyncio
 async def test_complete_structured_with_huggingface_fallback() -> None:
     """complete_structured successfully validates Pydantic model after fallback."""
-    openai_mock = MagicMock()
-    openai_mock.provider_name = "openai"
-    openai_mock.complete = AsyncMock(
+    gemini_mock = MagicMock()
+    gemini_mock.provider_name = "gemini"
+    gemini_mock.complete = AsyncMock(
         side_effect=ProviderError(
-            "OpenAI 429 rate limited",
-            provider="openai",
-            status_code=429,
-            fallback=True,
-            retry_same=False,
-        )
-    )
-
-    anthropic_mock = MagicMock()
-    anthropic_mock.provider_name = "anthropic"
-    anthropic_mock.complete = AsyncMock(
-        side_effect=ProviderError(
-            "Anthropic 500 error",
-            provider="anthropic",
+            "Gemini 500 error",
+            provider="gemini",
             status_code=500,
             fallback=True,
             retry_same=False,
@@ -249,8 +219,7 @@ async def test_complete_structured_with_huggingface_fallback() -> None:
 
     usage_log = LLMCallLog()
     router = LLMRouter(
-        openai_client=openai_mock,
-        anthropic_client=anthropic_mock,
+        gemini_client=gemini_mock,
         hf_client=hf_mock,
         max_attempts=1,
     )
@@ -264,7 +233,7 @@ async def test_complete_structured_with_huggingface_fallback() -> None:
         router,
         request,
         SampleReport,
-        provider="openai",
+        provider="gemini",
         operation="agent_report",
         usage=usage_log,
     )

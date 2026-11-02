@@ -23,7 +23,7 @@ export function Chat({ conversationId }: { conversationId?: string }) {
 
   useEffect(() => {
     const stored = window.localStorage.getItem("meridian-provider");
-    if (stored && ["gemini", "openai", "anthropic", "huggingface"].includes(stored)) setProvider(stored);
+    if (stored && ["gemini", "huggingface"].includes(stored)) setProvider(stored);
   }, []);
 
   const load = useCallback(() => {
@@ -134,8 +134,6 @@ export function Chat({ conversationId }: { conversationId?: string }) {
                 onChange={(event) => setProvider(event.target.value)}
               >
                 <option value="gemini">Gemini</option>
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Claude</option>
                 <option value="huggingface">Hugging Face</option>
               </select>
             </label>

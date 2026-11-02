@@ -19,7 +19,7 @@ class GeminiChatClient:
 
     def __init__(self, api_key: str, default_model: str, timeout_seconds: float) -> None:
         self._api_key = api_key.strip()
-        self._default_model = default_model or "gemini-2.5-flash"
+        self._default_model = default_model or "gemini-flash-lite-latest"
         self._timeout = timeout_seconds
         self._client = (
             AsyncOpenAI(
@@ -146,6 +146,14 @@ def _translate(exc: Exception) -> ProviderError:
     if isinstance(exc, ProviderError):
         return exc
     status = getattr(exc, "status_code", None)
+    response = getattr(exc, "response", None)
+    headers = getattr(response, "headers", None) if response else None
+    retry_after: float | None = None
+    if headers and headers.get("retry-after"):
+        try:
+            retry_after = float(headers["retry-after"])
+        except (TypeError, ValueError):
+            retry_after = None
     if isinstance(exc, (APITimeoutError, APIConnectionError, httpx.TimeoutException)):
         return ProviderError(
             str(exc), provider="gemini", status_code=408, retry_same=True, fallback=True
@@ -157,6 +165,7 @@ def _translate(exc: Exception) -> ProviderError:
             status_code=429,
             retry_same=True,
             fallback=True,
+            retry_after=retry_after or 2.5,
         )
     if status in (401, 403):
         return ProviderError(

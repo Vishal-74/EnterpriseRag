@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     gemini: str = ""
     gemini_api_key: str = ""
+    gemini_chat_model: str = "gemini-flash-lite-latest"
 
     upload_dir: str = ""
     max_upload_bytes: int = 10 * 1024 * 1024

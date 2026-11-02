@@ -23,31 +23,29 @@ class LLMRouter:
 
     def __init__(
         self,
-        openai_client: ChatClient,
-        anthropic_client: ChatClient,
+        gemini_client: ChatClient,
         hf_client: ChatClient | None = None,
-        gemini_client: ChatClient | None = None,
+        openai_client: ChatClient | None = None,
+        anthropic_client: ChatClient | None = None,
         *,
-        max_attempts: int = 2,
+        max_attempts: int = 4,
         sleep: Callable[[float], Awaitable[None]] | None = None,
     ) -> None:
         self._clients: dict[str, ChatClient] = {
-            "openai": openai_client,
-            "anthropic": anthropic_client,
+            "gemini": gemini_client,
         }
         if hf_client is not None:
             self._clients["huggingface"] = hf_client
-        if gemini_client is not None:
-            self._clients["gemini"] = gemini_client
+        if openai_client is not None:
+            self._clients["openai"] = openai_client
+        if anthropic_client is not None:
+            self._clients["anthropic"] = anthropic_client
+
         self._max_attempts = max_attempts
         self._sleep = sleep or asyncio.sleep
 
     def _fallback_order(self, preferred: str) -> list[str]:
-        default_order = (
-            ["gemini", "openai", "anthropic", "huggingface"]
-            if "gemini" in self._clients
-            else ["openai", "anthropic", "huggingface"]
-        )
+        default_order = ["gemini", "huggingface"]
         if preferred in default_order:
             remaining = [p for p in default_order if p != preferred]
             ordered = [preferred, *remaining]
@@ -64,7 +62,7 @@ class LLMRouter:
         usage: UsageRecorder | None = None,
     ) -> CompletionResult:
         """Return the first successful completion following the fallback chain."""
-        primary_name = provider or "openai"
+        primary_name = provider if provider in self._clients else "gemini"
         chain = self._fallback_order(primary_name)
         if not chain:
             raise ProviderError("No LLM provider available", provider=primary_name, fallback=False)
@@ -97,7 +95,7 @@ class LLMRouter:
         usage: UsageRecorder | None,
     ) -> CompletionResult:
         client = self._clients[provider_name]
-        delay = 0.4
+        delay = 1.0
         last_error: ProviderError | None = None
         for attempt in range(1, self._max_attempts + 1):
             try:
@@ -109,11 +107,17 @@ class LLMRouter:
                 wait = (
                     exc.retry_after
                     if exc.retry_after is not None
-                    else delay + random.random() * 0.2
+                    else max(delay + random.random() * 0.5, 2.0)
                 )
-                logger.warning("llm retry provider=%s attempt=%s", provider_name, attempt)
+                logger.warning(
+                    "llm retry provider=%s attempt=%s wait=%.1fs error=%s",
+                    provider_name,
+                    attempt,
+                    wait,
+                    exc.message,
+                )
                 await self._sleep(wait)
-                delay *= 2
+                delay *= 1.5
                 continue
             if usage is not None:
                 await usage.record(_event(result, operation, status="success", error=None))

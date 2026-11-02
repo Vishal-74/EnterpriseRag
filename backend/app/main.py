@@ -23,10 +23,8 @@ from app.core.rate_limit import SlidingWindowLimiter
 from app.db.session import dispose_engine, get_session, init_engine
 from app.runtime import AppRuntime, set_runtime
 from app.services.jobs import AsyncJobDispatcher, InlineJobDispatcher
-from app.services.llm.anthropic_client import AnthropicChatClient
 from app.services.llm.gemini_client import GeminiChatClient, GeminiEmbedder
 from app.services.llm.hf_client import HuggingFaceChatClient
-from app.services.llm.openai_client import OpenAIChatClient, OpenAIEmbedder
 from app.services.llm.router import LLMRouter
 from app.services.llm.types import Embedder
 from app.services.worker import agent_job, ingest_job
@@ -61,39 +59,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     init_engine(settings.async_database_url)
     gemini_key = settings.gemini_api_key or settings.gemini
-    gemini_client = (
-        GeminiChatClient(gemini_key, "gemini-2.5-flash", settings.llm_timeout_seconds)
-        if gemini_key
-        else None
+    gemini_client = GeminiChatClient(
+        gemini_key, settings.gemini_chat_model, settings.llm_timeout_seconds
+    )
+    hf_client = HuggingFaceChatClient(
+        settings.hf_token,
+        settings.hf_base_url,
+        settings.hf_model_id,
+        settings.llm_timeout_seconds,
     )
 
     router = LLMRouter(
-        OpenAIChatClient(
-            settings.openai_api_key, settings.openai_chat_model, settings.llm_timeout_seconds
-        ),
-        AnthropicChatClient(
-            settings.anthropic_api_key,
-            settings.anthropic_chat_model,
-            settings.llm_timeout_seconds,
-        ),
-        hf_client=HuggingFaceChatClient(
-            settings.hf_token,
-            settings.hf_base_url,
-            settings.hf_model_id,
-            settings.llm_timeout_seconds,
-        ),
         gemini_client=gemini_client,
+        hf_client=hf_client,
         max_attempts=settings.llm_max_attempts,
     )
-    embedder: Embedder
-    if not settings.openai_api_key and gemini_key:
-        embedder = GeminiEmbedder(gemini_key, "gemini-embedding-001", settings.llm_timeout_seconds)
-    else:
-        embedder = OpenAIEmbedder(
-            settings.openai_api_key,
-            settings.embedding_model,
-            settings.llm_timeout_seconds,
-        )
+    embedder: Embedder = GeminiEmbedder(
+        gemini_key, "gemini-embedding-001", settings.llm_timeout_seconds
+    )
     dispatcher_cls = InlineJobDispatcher if app.state.inline_jobs else AsyncJobDispatcher
     dispatcher = dispatcher_cls(ingest_job, agent_job)
     runtime = AppRuntime(
