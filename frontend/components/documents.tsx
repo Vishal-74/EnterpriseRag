@@ -59,13 +59,23 @@ export function Documents() {
   }
 
   async function remove(id: string) {
-    await api.removeDocument(id);
-    load();
+    try {
+      setError(null);
+      await api.removeDocument(id);
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Delete failed.");
+    }
   }
 
   async function reprocess(id: string) {
-    await api.reprocess(id);
-    load();
+    try {
+      setError(null);
+      await api.reprocess(id);
+      load();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Reprocess failed.");
+    }
   }
 
   return (

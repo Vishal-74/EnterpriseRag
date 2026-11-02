@@ -20,7 +20,15 @@ async function forward(request: Request, path: string[]) {
   }
   const method = request.method.toUpperCase();
   const body = method === "GET" || method === "HEAD" ? undefined : await request.arrayBuffer();
-  const upstream = await fetch(target, { method, headers, body, cache: "no-store" });
+  let upstream: Response;
+  try {
+    upstream = await fetch(target, { method, headers, body, cache: "no-store" });
+  } catch (caught) {
+    return NextResponse.json(
+      { error: { code: "service_unavailable", message: "Backend service is temporarily unavailable. Please retry." } },
+      { status: 503 },
+    );
+  }
   if (upstream.status === 204) {
     return new NextResponse(null, { status: 204 });
   }
