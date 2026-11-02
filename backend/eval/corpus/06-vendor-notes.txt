@@ -1,0 +1,3 @@
+Vendor Helios Pumps recommends replacing bearings on P-series pumps every 18 months.
+Vendor Lumen Sensors says T-series sensors drift after 24 months without calibration.
+The support portal is support.example-vendors.test. The Helios contract renews on 1 August 2026.
