@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 class AgentRunRequest(BaseModel):
     task: str = Field(min_length=3, max_length=4000)
     document_ids: list[UUID] = Field(default_factory=list)
-    provider: Literal["openai", "anthropic"] | None = None
+    provider: Literal["openai", "anthropic", "gemini", "huggingface"] | None = None
 
 
 class AgentStepRead(BaseModel):

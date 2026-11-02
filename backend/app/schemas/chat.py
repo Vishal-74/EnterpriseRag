@@ -26,7 +26,7 @@ class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     conversation_id: UUID | None = None
     document_ids: list[UUID] | None = None
-    provider: Literal["openai", "anthropic"] | None = None
+    provider: Literal["openai", "anthropic", "gemini", "huggingface"] | None = None
 
 
 class ChatResponse(BaseModel):

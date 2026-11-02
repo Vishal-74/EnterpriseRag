@@ -26,6 +26,7 @@ class LLMRouter:
         openai_client: ChatClient,
         anthropic_client: ChatClient,
         hf_client: ChatClient | None = None,
+        gemini_client: ChatClient | None = None,
         *,
         max_attempts: int = 2,
         sleep: Callable[[float], Awaitable[None]] | None = None,
@@ -36,11 +37,17 @@ class LLMRouter:
         }
         if hf_client is not None:
             self._clients["huggingface"] = hf_client
+        if gemini_client is not None:
+            self._clients["gemini"] = gemini_client
         self._max_attempts = max_attempts
         self._sleep = sleep or asyncio.sleep
 
     def _fallback_order(self, preferred: str) -> list[str]:
-        default_order = ["openai", "anthropic", "huggingface"]
+        default_order = (
+            ["gemini", "openai", "anthropic", "huggingface"]
+            if "gemini" in self._clients
+            else ["openai", "anthropic", "huggingface"]
+        )
         if preferred in default_order:
             remaining = [p for p in default_order if p != preferred]
             ordered = [preferred, *remaining]

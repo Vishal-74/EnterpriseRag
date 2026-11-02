@@ -156,4 +156,3 @@ def _retry_after(exc: Exception) -> float | None:
         return float(raw)
     except (TypeError, ValueError):
         return None
-

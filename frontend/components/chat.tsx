@@ -14,7 +14,7 @@ export function Chat({ conversationId }: { conversationId?: string }) {
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState("gemini");
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -23,7 +23,7 @@ export function Chat({ conversationId }: { conversationId?: string }) {
 
   useEffect(() => {
     const stored = window.localStorage.getItem("meridian-provider");
-    if (stored === "openai" || stored === "anthropic") setProvider(stored);
+    if (stored && ["gemini", "openai", "anthropic", "huggingface"].includes(stored)) setProvider(stored);
   }, []);
 
   const load = useCallback(() => {
@@ -133,6 +133,7 @@ export function Chat({ conversationId }: { conversationId?: string }) {
                 value={provider}
                 onChange={(event) => setProvider(event.target.value)}
               >
+                <option value="gemini">Gemini</option>
                 <option value="openai">OpenAI</option>
                 <option value="anthropic">Claude</option>
                 <option value="huggingface">Hugging Face</option>
