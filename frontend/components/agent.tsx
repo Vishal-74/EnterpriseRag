@@ -97,23 +97,25 @@ export function Agent() {
         <EmptyState title="No runs yet" body="Start a task to see the tool timeline." />
       ) : null}
       {active ? (
-        <section className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-          <ol className="space-y-3">
+        <section className="grid gap-4 min-w-0 max-w-full lg:grid-cols-[1fr_1fr]">
+          <ol className="min-w-0 space-y-3">
             {active.steps.map((step) => (
-              <li key={step.id} className="rounded-2xl border border-line bg-white p-4">
+              <li key={step.id} className="min-w-0 overflow-hidden rounded-2xl border border-line bg-white p-4">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium">{step.tool_name}</span>
                   <span className="text-mist">
                     {step.status} · {step.latency_ms} ms
                   </span>
                 </div>
-                {step.error ? <p className="mt-2 text-sm text-red-800">{step.error}</p> : null}
-                <pre className="mt-2 overflow-x-auto text-xs text-mist">{JSON.stringify(step.tool_output, null, 2)}</pre>
+                {step.error ? <p className="mt-2 text-sm text-red-800 break-words">{step.error}</p> : null}
+                <pre className="mt-2 max-w-full overflow-x-auto rounded bg-paper/60 p-2 text-xs text-mist whitespace-pre-wrap break-all">
+                  {JSON.stringify(step.tool_output, null, 2)}
+                </pre>
               </li>
             ))}
             {active.status === "running" ? <li className="text-sm text-mist">Waiting for the next step…</li> : null}
           </ol>
-          <article className="rounded-2xl border border-line bg-white p-4">
+          <article className="min-w-0 overflow-hidden rounded-2xl border border-line bg-white p-4">
             <h2 className="font-display text-2xl">{report?.title || "Report"}</h2>
             <p className="mt-2 text-sm text-mist">
               Status {active.status}
@@ -121,16 +123,28 @@ export function Agent() {
               {active.error ? ` · ${active.error}` : ""}
             </p>
             {report ? (
-              <div className="mt-4 space-y-3 text-sm">
-                <p>{report.summary}</p>
-                {report.findings.map((finding) => (
-                  <div key={finding.statement}>
-                    <p className="font-medium">{finding.statement}</p>
-                    <p className="text-mist">{finding.evidence.join(", ")}</p>
+              <div className="mt-4 space-y-3 text-sm break-words">
+                <p className="leading-relaxed">{report.summary}</p>
+                {report.findings.map((finding, idx) => (
+                  <div key={idx} className="rounded-xl border border-line/60 bg-paper/40 p-3">
+                    <p className="font-medium text-ink">{finding.statement}</p>
+                    {finding.evidence?.length ? (
+                      <p className="mt-1 text-xs text-mist break-words">Evidence: {finding.evidence.join("; ")}</p>
+                    ) : null}
                   </div>
                 ))}
-                {report.recommendations.length ? <p>Recommendations: {report.recommendations.join(" ")}</p> : null}
-                {report.gaps.length ? <p>Gaps: {report.gaps.join(" ")}</p> : null}
+                {report.recommendations.length ? (
+                  <div className="rounded-xl border border-line/60 bg-paper/40 p-3">
+                    <p className="font-medium text-ink">Recommendations</p>
+                    <p className="mt-1 text-xs text-mist">{report.recommendations.join(" ")}</p>
+                  </div>
+                ) : null}
+                {report.gaps.length ? (
+                  <div className="rounded-xl border border-line/60 bg-paper/40 p-3">
+                    <p className="font-medium text-ink">Identified Gaps</p>
+                    <p className="mt-1 text-xs text-mist">{report.gaps.join(" ")}</p>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <p className="mt-4 text-sm text-mist">The report appears when the run finishes.</p>

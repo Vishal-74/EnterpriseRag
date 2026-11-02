@@ -15,8 +15,16 @@ class SqlUsageRecorder:
 
     def __init__(self, user_id: UUID | None) -> None:
         self._user_id = user_id
+        self.prompt_tokens: int = 0
+        self.completion_tokens: int = 0
+
+    @property
+    def total_tokens(self) -> int:
+        return self.prompt_tokens + self.completion_tokens
 
     async def record(self, event: UsageEvent) -> None:
+        self.prompt_tokens += event.prompt_tokens
+        self.completion_tokens += event.completion_tokens
         if db_session.SessionLocal is None:
             db_session.init_engine(get_runtime().settings.async_database_url)
         assert db_session.SessionLocal is not None

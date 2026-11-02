@@ -181,14 +181,17 @@ function MessageFlags({ metadata }: { metadata: Record<string, unknown> }) {
   const insufficient = metadata.insufficient_evidence === true;
   const conflict = metadata.conflict === true;
   const ungrounded = metadata.ungrounded === true;
+  const totalTokens = Number(metadata.total_tokens || 0);
+  const historyTokens = Number(metadata.history_tokens || 0);
   return (
     <div className="mt-2 space-y-1 text-xs">
       {insufficient ? <p className="text-amber-900">Not enough information in the selected documents.</p> : null}
       {conflict ? <p className="text-clay">Conflict found. {String(metadata.conflict_summary || "")}</p> : null}
       {ungrounded ? <p className="text-red-800">The verifier did not support the claims.</p> : null}
       <p className="text-mist">
-        {String(metadata.model || "no model")} · {String(metadata.latency_ms || 0)} ms · history{" "}
-        {String(metadata.history_tokens || 0)} tokens
+        {String(metadata.model || "no model")} · {String(metadata.latency_ms || 0)} ms
+        {totalTokens > 0 ? ` · ${totalTokens} tokens` : ""}
+        {` · ${historyTokens} history tokens`}
       </p>
     </div>
   );

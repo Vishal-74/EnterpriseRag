@@ -57,7 +57,7 @@ export function Shell({ email, children }: { email: string; children: React.Reac
           </button>
         </div>
       </aside>
-      <main className="px-4 py-6 md:px-10 md:py-8">{children}</main>
+      <main className="min-w-0 max-w-full overflow-x-hidden px-4 py-6 md:px-10 md:py-8">{children}</main>
     </div>
   );
 }
