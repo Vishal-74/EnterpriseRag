@@ -43,7 +43,43 @@ from app.services.retrieval.reranker import rerank
 from app.services.retrieval.rewriter import rewrite_query
 from app.services.retrieval.types import ScoredChunk
 
-_GATE = "There is not enough information in the selected documents to answer that."
+_GATE = (
+    "There is not enough information in the selected documents to answer that. "
+    "I specialize in answering questions based on your uploaded library. "
+    "Please ask a factual question related to your documents (such as system procedures, "
+    "equipment specs, or operational metrics)."
+)
+
+_GREETINGS = {
+    "hi",
+    "hello",
+    "hey",
+    "hey there",
+    "hiya",
+    "howdy",
+    "greetings",
+    "good morning",
+    "good afternoon",
+    "good evening",
+    "who are you",
+    "what are you",
+    "what can you do",
+    "how can you help",
+    "how can you help me",
+    "help",
+    "help me",
+}
+
+_GREETING_MESSAGE = (
+    "Hello! I am your enterprise document intelligence assistant. "
+    "How can I help you today? You can ask me factual questions, request summaries, "
+    "or investigate operational procedures and technical specifications from the documents in your library."
+)
+
+
+def _is_conversational_greeting(text: str) -> bool:
+    cleaned = "".join(ch for ch in text.lower().strip() if ch.isalnum() or ch.isspace()).strip()
+    return cleaned in _GREETINGS
 
 
 class ChatService:
@@ -83,45 +119,48 @@ class ChatService:
         self._conversations.add_message(user_message)
         if conversation.title == "New conversation":
             conversation.title = payload.message.strip()[:80]
-        await self._scope(user.id, payload.document_ids)
-        rewritten = await rewrite_query(
-            self._router,
-            payload.message.strip(),
-            memory,
-            provider=payload.provider,
-            usage=self._usage,
-            prompt_version=self._settings.prompt_version,
-        )
-        chunks = await self._retriever.search(
-            user_id=user.id,
-            query=rewritten,
-            document_ids=payload.document_ids,
-        )
-        if self._settings.rerank_enabled and any(chunk.relevant for chunk in chunks):
-            chunks = await rerank(
+        if _is_conversational_greeting(payload.message):
+            response = self._greet(conversation, started)
+        else:
+            await self._scope(user.id, payload.document_ids)
+            rewritten = await rewrite_query(
                 self._router,
-                chunks,
-                rewritten,
+                payload.message.strip(),
+                memory,
                 provider=payload.provider,
                 usage=self._usage,
                 prompt_version=self._settings.prompt_version,
             )
-        guarded = [guard_text(chunk.chunk.content) for chunk in chunks]
-        flags = _unique([flag for item in guarded for flag in item.flags])
-        if not chunks or not any(chunk.relevant for chunk in chunks):
-            response = self._gate(conversation, flags, memory.history_tokens, started)
-        else:
-            response = await self._answer(
-                user,
-                payload,
-                conversation,
-                rewritten,
-                memory,
-                chunks,
-                guarded,
-                flags,
-                started,
+            chunks = await self._retriever.search(
+                user_id=user.id,
+                query=rewritten,
+                document_ids=payload.document_ids,
             )
+            if self._settings.rerank_enabled and any(chunk.relevant for chunk in chunks):
+                chunks = await rerank(
+                    self._router,
+                    chunks,
+                    rewritten,
+                    provider=payload.provider,
+                    usage=self._usage,
+                    prompt_version=self._settings.prompt_version,
+                )
+            guarded = [guard_text(chunk.chunk.content) for chunk in chunks]
+            flags = _unique([flag for item in guarded for flag in item.flags])
+            if not chunks or not any(chunk.relevant for chunk in chunks):
+                response = self._gate(conversation, flags, memory.history_tokens, started)
+            else:
+                response = await self._answer(
+                    user,
+                    payload,
+                    conversation,
+                    rewritten,
+                    memory,
+                    chunks,
+                    guarded,
+                    flags,
+                    started,
+                )
         assistant = Message(
             conversation_id=conversation.id,
             user_id=user.id,
@@ -303,6 +342,24 @@ class ChatService:
         except IntegrityError:
             pass
         return response
+
+    def _greet(
+        self,
+        conversation: Conversation,
+        started: float,
+    ) -> ChatResponse:
+        return ChatResponse(
+            conversation_id=conversation.id,
+            message_id=conversation.id,
+            answer=_GREETING_MESSAGE,
+            citations=[],
+            insufficient_evidence=False,
+            conflict=False,
+            injection_flags=[],
+            answer_origin="retrieval_gate",
+            history_tokens=0,
+            latency_ms=_elapsed(started),
+        )
 
     def _gate(
         self,
