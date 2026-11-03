@@ -17,6 +17,10 @@ Production-ready enterprise document intelligence platform. Upload PDF, TXT, Mar
 
 ## Architecture
 
+![Meridian Architecture](docs/architecture.png)
+
+Detailed diagrams, lifecycle sequence charts, and subsystem specifications: [docs/architecture.md](docs/architecture.md).
+
 ```
 Browser (Next.js 15 on Vercel)
    │  HTTPS + httpOnly Session Cookie
@@ -32,7 +36,19 @@ FastAPI Backend (Render)
 Supabase Managed Database (PostgreSQL 17 + pgvector + HNSW index)
 ```
 
-Detailed diagrams and pipeline lifecycles: [docs/architecture.md](docs/architecture.md).
+---
+
+## Advanced Challenges Completed
+
+| Challenge | Implementation | Status |
+| :--- | :--- | :---: |
+| **1. Intelligent Model Fallback** | `LLMRouter` with Google Gemini primary, cascading to Hugging Face / OpenAI with jittered backoff | ✅ Done |
+| **2. Prompt Injection Defense** | Strips jailbreak patterns and wraps untrusted chunks in `<document_evidence>` XML delimiters | ✅ Done |
+| **3. Retrieval Optimization** | Dual-channel hybrid search (HNSW pgvector + PostgreSQL full-text search) merged with RRF ($k=60$) + reranking | ✅ Done |
+| **4. AI Response Verification** | Two-pass verifier audits every generated factual claim against cited source chunk excerpts | ✅ Done |
+| **5. Cost Optimization** | Deterministic SHA-256 embedding and answer cache with 7-day TTL and corpus fingerprinting | ✅ Done |
+| **6. Asynchronous Ingestion** | Background worker queue with instant HTTP 202, polling, duplicate rejection (409), and reprocessing | ✅ Done |
+| **7. Agent Reliability** | LangGraph cyclic graph with hard step limits (max 6), tool timeouts (45s), run timeouts (120s), and parameter recovery | ✅ Done |
 
 ---
 
@@ -51,7 +67,7 @@ Detailed diagrams and pipeline lifecycles: [docs/architecture.md](docs/architect
    - **Conflict Detection**: Identifies and reports contradicting claims across different documents with dual citations.
 3. **Multi-Model LLM Gateway**:
    - Primary: **Google Gemini** (`gemini-flash-lite-latest` for completions, `gemini-embedding-001` for vectors).
-   - Fallback: **Hugging Face** (`meta-llama/Llama-3.2-3B-Instruct` via OpenAI-compatible router).
+   - Fallback: **Hugging Face** / **OpenAI** / **Anthropic** via unified `LLMRouter`.
    - Automatic retries with exponential backoff and instant fail-fast on 400/402/404 errors.
 4. **Autonomous Agent**:
    - Built on **LangGraph** with 3 structured tools: `search_knowledge_base`, `analyze_documents`, and `generate_report`.
@@ -61,14 +77,57 @@ Detailed diagrams and pipeline lifecycles: [docs/architecture.md](docs/architect
 
 ---
 
+## Evaluation & Benchmark Results
+
+The evaluation dataset (`backend/eval/dataset.json`) contains **28 questions** across 6 categories (factual, conflict, multi-doc, injection, unanswerable, follow-up) tested against an original 10-document corpus.
+
+Full methodology and metrics: [docs/evaluation_report.md](docs/evaluation_report.md).
+
+### REST API Endpoints Benchmark (`backend/eval/results/endpoints_eval.json`)
+```
+========================================================
+  Evaluation Results Summary (HTTP REST API Endpoints)
+========================================================
+  Total Questions Tested:       28
+  All Endpoints Completed:      True
+  Retrieval Hit Rate:           100.0%
+  Mean Reciprocal Rank (MRR):   1.000
+  Lexical Grounding Match Rate: 92.0%
+  Insufficient Evidence Rate:   100.0%
+  Conflict Detection Rate:      100.0%
+  Prompt Injection Block Rate:  100.0%
+  Mean Latency:                 4917 ms
+========================================================
+```
+
+To run the evaluation suites:
+```bash
+# 1. Full HTTP Endpoints Suite (simulates complete client network requests)
+cd backend && .venv/bin/python eval/run_eval_endpoints.py
+
+# 2. Service-level Python evaluation
+cd backend && .venv/bin/python eval/run_eval.py
+```
+
+---
+
+## Key Project Documents
+
+- [docs/architecture.md](docs/architecture.md) — Comprehensive architecture diagrams and request lifecycles
+- [docs/evaluation_report.md](docs/evaluation_report.md) — Detailed benchmark methodology, metrics, and limitations
+- [DECISIONS.md](DECISIONS.md) — Architectural decisions log (D-001 through D-018) with rationales and tradeoffs
+- [DEVELOPMENT_REPORT.md](DEVELOPMENT_REPORT.md) — Engineering process notes, tool usage disclosure, and validated behaviors
+
+---
+
 ## Repository Structure
 
 - `backend/app` — FastAPI application (services, repositories, models, API routes).
 - `backend/alembic` — Schema migrations for tables, foreign keys, and the pgvector HNSW index.
 - `backend/tests` — 35 automated unit and integration tests (`pytest`).
-- `backend/eval` — 28-question evaluation dataset and evaluation runner (`run_eval.py`).
+- `backend/eval` — 28-question evaluation dataset and evaluation runners (`run_eval.py`, `run_eval_endpoints.py`).
 - `frontend` — Next.js 15 App Router interface (responsive 3-column chat, document manager, agent timeline, dashboard).
-- `docs` — Architecture specifications and evaluation report.
+- `docs` — Architecture diagram PNG, specifications, and evaluation report.
 
 ---
 

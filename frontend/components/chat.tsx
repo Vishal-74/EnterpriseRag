@@ -200,14 +200,14 @@ export function Chat({ conversationId }: { conversationId?: string }) {
                     onClick={() => setDraft("What model of backup generator is installed in the facility and what is its rating?")}
                     className="rounded-lg border border-line/60 bg-white px-3 py-1.5 text-mist transition-colors hover:border-ink hover:text-ink"
                   >
-                    "What model of backup generator is installed in the facility and what is its rating?"
+                    &quot;What model of backup generator is installed in the facility and what is its rating?&quot;
                   </button>
                   <button
                     type="button"
                     onClick={() => setDraft("What is the required fuel reserve percentage for the generators?")}
                     className="rounded-lg border border-line/60 bg-white px-3 py-1.5 text-mist transition-colors hover:border-ink hover:text-ink"
                   >
-                    "What is the required fuel reserve percentage for the generators?"
+                    &quot;What is the required fuel reserve percentage for the generators?&quot;
                   </button>
                 </div>
               </div>

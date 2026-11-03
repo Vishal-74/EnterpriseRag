@@ -41,7 +41,7 @@ class LLMRouter:
         if anthropic_client is not None:
             self._clients["anthropic"] = anthropic_client
 
-        self._max_attempts = max_attempts
+        self._max_attempts = max(max_attempts, 5)
         self._sleep = sleep or asyncio.sleep
 
     def _fallback_order(self, preferred: str) -> list[str]:
@@ -104,10 +104,11 @@ class LLMRouter:
                 last_error = exc
                 if not exc.retry_same or attempt == self._max_attempts:
                     raise
+                base_wait = 4.0 if exc.status_code == 429 else 2.0
                 wait = (
                     exc.retry_after
                     if exc.retry_after is not None
-                    else max(delay + random.random() * 0.5, 2.0)
+                    else max(delay + random.random() * 0.5, base_wait)
                 )
                 logger.warning(
                     "llm retry provider=%s attempt=%s wait=%.1fs error=%s",
