@@ -1,68 +1,108 @@
-# Meridian
+# Meridian — Enterprise Intelligence Platform
 
-Local-first enterprise document intelligence. Upload PDF, TXT, Markdown, and CSV files, ask questions with citations, and run a tool-using agent that writes a structured report.
+Production-ready enterprise document intelligence platform. Upload PDF, TXT, Markdown, and CSV files, ask questions with verified citations, and run a LangGraph tool-using autonomous agent that generates structured analytical reports.
 
-The browser talks to a Next.js app. That app stores the session in an httpOnly cookie and forwards API calls to FastAPI. FastAPI stores users, documents, chunks, conversations, usage, and agent steps in Postgres with pgvector.
+## Live Deployment
 
-## Layout
+- **Frontend (Vercel):** [https://frontend-khaki-nu-82.vercel.app](https://frontend-khaki-nu-82.vercel.app)
+- **Backend API (Render):** [https://enterprise-intel-api-xu4a.onrender.com](https://enterprise-intel-api-xu4a.onrender.com)
+- **Interactive OpenAPI Documentation:** [https://enterprise-intel-api-xu4a.onrender.com/docs](https://enterprise-intel-api-xu4a.onrender.com/docs)
+- **Health Check:** [https://enterprise-intel-api-xu4a.onrender.com/health](https://enterprise-intel-api-xu4a.onrender.com/health)
 
-- `backend/app` — FastAPI application. Routes call services. Services call repositories.
-- `backend/alembic` — schema migrations, including the `vector` extension.
-- `backend/tests` — unit tests and Postgres integration tests. Test doubles live only under `tests/`.
-- `backend/eval` — sample corpus, question set, and the evaluation runner.
-- `frontend` — Next.js App Router UI.
-- `docs` — architecture and the evaluation write-up.
+### Demo Credentials for Reviewers
+- **Email:** `demo@example.com`
+- **Password:** `review-pass-1`
 
-## Local setup
+---
 
-Requirements: Docker, Python 3.10 or newer, Node 22.
+## Architecture
+
+```
+Browser (Next.js 15 on Vercel)
+   │  HTTPS + httpOnly Session Cookie
+   ▼
+FastAPI Backend (Render)
+   ├── Auth (JWT, Argon2 hashing)
+   ├── Ingestion Pipeline  ──> Background worker ──> parse ──> chunk (1000/150 overlap) ──> embed ──> store
+   ├── Advanced RAG        ──> query rewrite ──> hybrid search (HNSW pgvector + full-text) ──> RRF (k=60) ──> rerank ──> answer ──> verify claims
+   ├── Autonomous Agent    ──> LangGraph ──> search_knowledge_base ──> analyze_documents ──> generate_report
+   ├── LLM Router Gateway  ──> Google Gemini (primary) + Hugging Face (fallback) with exponential backoff & jitter
+   └── Observability       ──> usage_logs, activity_logs, agent_runs tables
+   ▼
+Supabase Managed Database (PostgreSQL 17 + pgvector + HNSW index)
+```
+
+Detailed diagrams and pipeline lifecycles: [docs/architecture.md](docs/architecture.md).
+
+---
+
+## Core Capabilities
+
+1. **Document Intelligence**:
+   - Supports PDF (page spans), Markdown (headers), CSV (rows and column headers), and plain text.
+   - SHA-256 cryptographic file hashing detects and rejects duplicate uploads per user.
+   - Asynchronous background worker processes parsing, chunking, and vector embedding generation.
+2. **Advanced RAG**:
+   - **Hybrid Search**: Combines dense vector similarity (`gemini-embedding-001`, 1536 dims) with PostgreSQL native full-text search (`tsvector` & `tsquery`).
+   - **Reciprocal Rank Fusion (RRF)**: Merges keyword and vector rankings ($k=60$).
+   - **Query Rewriter**: Rephrases conversational follow-up questions into standalone queries using conversation memory.
+   - **Prompt Injection Defense**: Sanitizes documents and encloses excerpts in strict `<document_evidence>` XML boundaries.
+   - **Claim Verification**: Second-pass verification compares generated answers against cited chunk IDs to compute factual grounding.
+   - **Conflict Detection**: Identifies and reports contradicting claims across different documents with dual citations.
+3. **Multi-Model LLM Gateway**:
+   - Primary: **Google Gemini** (`gemini-flash-lite-latest` for completions, `gemini-embedding-001` for vectors).
+   - Fallback: **Hugging Face** (`meta-llama/Llama-3.2-3B-Instruct` via OpenAI-compatible router).
+   - Automatic retries with exponential backoff and instant fail-fast on 400/402/404 errors.
+4. **Autonomous Agent**:
+   - Built on **LangGraph** with 3 structured tools: `search_knowledge_base`, `analyze_documents`, and `generate_report`.
+   - Hard execution limits: max 6 steps, 45-second per-tool timeout, and 120-second overall run timeout.
+5. **Observability Dashboard**:
+   - Tracks total tokens, token consumption by day and model, average & P95 latencies, error rates, and estimated costs.
+
+---
+
+## Repository Structure
+
+- `backend/app` — FastAPI application (services, repositories, models, API routes).
+- `backend/alembic` — Schema migrations for tables, foreign keys, and the pgvector HNSW index.
+- `backend/tests` — 35 automated unit and integration tests (`pytest`).
+- `backend/eval` — 28-question evaluation dataset and evaluation runner (`run_eval.py`).
+- `frontend` — Next.js 15 App Router interface (responsive 3-column chat, document manager, agent timeline, dashboard).
+- `docs` — Architecture specifications and evaluation report.
+
+---
+
+## Running Locally
+
+Requirements: Docker, Python 3.10+, Node 20+.
 
 ```bash
+# 1. Start local Postgres with pgvector
 docker compose up -d db
-python3 -m venv backend/.venv
-backend/.venv/bin/pip install -r backend/requirements.txt -r backend/requirements-dev.txt
-cp .env.example .env
-# Set JWT_SECRET to at least 32 random characters.
-cd backend && .venv/bin/alembic upgrade head
-cd frontend && npm install
+
+# 2. Setup backend
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+alembic upgrade head
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+
+# 3. Setup frontend (in a second terminal)
+cd frontend
+npm install
+npm run dev
 ```
 
-`make db`, `make install`, and `make migrate` do the same steps.
+Visit [http://localhost:3000](http://localhost:3000).
 
-Start the API and the UI in two terminals:
+---
+
+## Running Automated Tests
 
 ```bash
-make api
-make web
+cd backend
+source .venv/bin/activate
+pytest tests
 ```
-
-Open http://localhost:3000 and register an account. Without `OPENAI_API_KEY`, uploads are accepted and then marked failed with a message to set the key and reprocess. Chat and the agent return a provider error. The dashboard stays at zero until a real model call is logged.
-
-Optional demo account, after both keys you want are in `.env`:
-
-```bash
-cd backend && .venv/bin/python scripts/seed_demo.py
-```
-
-The script reads `DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD`. It embeds the sample corpus only when `OPENAI_API_KEY` is set.
-
-## Checks
-
-```bash
-make lint
-make test
-```
-
-Integration tests use the `enterprise_intel_test` database and refuse to truncate any other database name. They use `FakeEmbedder` and `FakeRouter`, which are not wired into the application runtime.
-
-## Evaluation
-
-```bash
-cd backend && .venv/bin/python eval/run_eval.py
-```
-
-If `OPENAI_API_KEY` is empty the command exits with status 2 and does not write a score file. A completed run writes `backend/eval/results/latest.json`. See `docs/evaluation_report.md`.
-
-## Deploy
-
-`backend/Dockerfile` runs the migration and uvicorn. `render.yaml` describes the API service. The frontend is a standard Next.js app: set `API_URL` to the public API origin. Set `DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, and `CORS_ORIGINS` on the API host. This repository does not contain a live deployment.
+All 35 unit and integration tests run against an isolated test database.
