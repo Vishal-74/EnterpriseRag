@@ -147,7 +147,11 @@ export function Agent() {
                 ) : null}
               </div>
             ) : (
-              <p className="mt-4 text-sm text-mist">The report appears when the run finishes.</p>
+              <p className="mt-4 text-sm text-mist">
+                {active.status === "completed"
+                  ? `Run completed (${active.stop_reason || "finished"}). No structured report was generated.`
+                  : "The report appears when the run finishes."}
+              </p>
             )}
           </article>
         </section>

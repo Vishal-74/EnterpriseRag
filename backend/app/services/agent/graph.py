@@ -82,8 +82,21 @@ class AgentGraph:
         return builder.compile()
 
     async def _plan(self, state: AgentState) -> dict[str, Any]:
-        if state.get("step_count", 0) >= self._context.settings.agent_max_steps:
+        step_count = state.get("step_count", 0)
+        if step_count >= self._context.settings.agent_max_steps:
             return {"next_tool": "finish", "stop_reason": "step_limit"}
+        if (
+            step_count == self._context.settings.agent_max_steps - 1
+            and not state.get("report")
+            and state.get("observations")
+        ):
+            return {
+                "next_tool": "generate_report",
+                "next_args": {
+                    "title": state.get("task", "Investigation Report")[:100],
+                    "focus": state.get("task", "")[:200],
+                },
+            }
         observations = _render_observations(state.get("observations", []))
         request = CompletionRequest(
             messages=messages_from(
@@ -167,11 +180,27 @@ class AgentGraph:
         return update
 
     async def _finish(self, state: AgentState) -> dict[str, Any]:
-        if state.get("stop_reason"):
-            return {"stop_reason": state["stop_reason"]}
-        if state.get("step_count", 0) >= self._context.settings.agent_max_steps:
-            return {"stop_reason": "step_limit"}
-        return {"stop_reason": "finished"}
+        stop_reason = state.get("stop_reason")
+        if not stop_reason:
+            if state.get("step_count", 0) >= self._context.settings.agent_max_steps:
+                stop_reason = "step_limit"
+            else:
+                stop_reason = "finished"
+
+        report = state.get("report")
+        if report is None and state.get("observations"):
+            try:
+                self._context.observations = list(state.get("observations", []))
+                report = await generate_report(
+                    ReportArgs(
+                        title=state.get("task", "Investigation Report")[:100],
+                        focus=state.get("task", "")[:200],
+                    ),
+                    self._context,
+                )
+            except Exception:
+                pass
+        return {"stop_reason": stop_reason, "report": report}
 
     async def _record(
         self,
