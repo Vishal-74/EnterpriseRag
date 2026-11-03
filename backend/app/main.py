@@ -114,6 +114,16 @@ def create_app(settings: Settings | None = None, *, inline_jobs: bool = False) -
     app.add_middleware(RequestContextMiddleware)
     app.include_router(api_router, prefix="/api")
 
+    @app.get("/", tags=["root"])
+    async def root() -> dict[str, str]:
+        return {
+            "name": "Meridian Enterprise Intelligence Platform API",
+            "version": "1.0.0",
+            "status": "online",
+            "documentation": "/docs",
+            "health": "/health",
+        }
+
     @app.get("/health", tags=["health"])
     async def health() -> dict[str, str]:
         return {"status": "ok"}
