@@ -8,7 +8,7 @@ The corpus in `backend/eval/corpus` is original sample material about a fictiona
 
 `backend/eval/run_eval.py` creates a user, ingests the corpus with the production parser and embedder, and calls `ChatService` for each question. It then records retrieval hits, reciprocal rank, lexical overlap with the expected fragments, the insufficient-evidence flag, the conflict flag, whether forbidden text appeared, latency, and token counts. Those numbers are written to `backend/eval/results/latest.json` only after that run.
 
-The runner exits with status 2 when `OPENAI_API_KEY` is unset and does not create a results file.
+The runner exits with status 2 when the Gemini API key is unset and does not create a results file.
 
 ## Scored Run Results (Gemini Flash Lite + Gemini Embedding)
 
