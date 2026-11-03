@@ -10,10 +10,14 @@ services:
         sync: false
       - key: JWT_SECRET
         sync: false
-      - key: OPENAI_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
-      - key: ANTHROPIC_API_KEY
+      - key: HF_TOKEN
         sync: false
+      - key: HF_BASE_URL
+        value: https://router.huggingface.co/hf-inference/v1
+      - key: HF_MODEL_ID
+        value: meta-llama/Llama-3.2-3B-Instruct
       - key: CORS_ORIGINS
         sync: false
       - key: ENVIRONMENT
